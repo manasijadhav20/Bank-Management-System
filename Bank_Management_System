@@ -1,0 +1,688 @@
+/*
+THE FILE IS TO BE WRITTEN IN THE FOLLOWING FORMAT....
+NAME1,NAME2,USERNAME,AGE,D.O.B.,ACC_TYPE,AMOUNT, 
+
+
+GLOBAL CONSTANTS
+*/
+#define RECORD_LENGTH 50
+	//constant specifying the record length in a file
+#define USERNAME_SIZE 10
+#define NAME1_SIZE 15
+#define NAME2_SIZE 15
+#define PASSWD_SIZE 10
+
+//getstring modes of operation
+
+#define CHARONLY 00
+#define RANDOM 01
+#define USERINPUT 02
+
+
+//writing modes of operation
+
+#define NEW 00
+#define REWRITE 01
+
+/*
+INCLUDE FILES
+*/
+#include<stdio.h>
+#include<string.h>
+#include<stdlib.h>
+#include<ctype.h>
+#include<time.h>
+
+typedef struct USRDAT
+{
+	char name1st[NAME1_SIZE];
+	char name2nd[NAME2_SIZE];
+	char username[USERNAME_SIZE];
+	int age;
+	long int dob;
+	char acc_type;
+	int amount;
+	char passwd[PASSWD_SIZE];
+}USRDAT;
+
+
+/*
+USER FUNCTIONS
+*/
+void create_account();
+USRDAT login();
+void transactions();
+void cur_account(USRDAT);
+
+/*
+SYSTEM FUNCTIONS
+*/
+void getstring(char*,int,int);
+void getrandom(char*,int);
+long int readdob();
+int readage(); 
+/*
+DATABASE FUNCTIONS
+*/
+long int findblank();	//TO FIND THE FIRST DELETED LINE....
+void write_record(USRDAT,int);
+void recordwrite(long int,USRDAT);
+long int deleterecord(USRDAT);
+
+void showhistory(char*,char*);
+void writehistory(USRDAT);
+
+/*
+ERROR FUNCTIONS
+*/
+int validate(USRDAT*);
+/*
+MAIN FUNCTION
+*/
+
+
+
+void main()
+{
+	printf("\e[1;1H\e[2J");//REGEX to clear console
+//CAUTION!!!
+//Do NOT change the above regex.I don't exactly know what it does
+	printf("Welcome to *** Bank\n");
+	printf("If you have an existing account , please login.\
+	Else create a new account before proceeding...\n");
+	int choice1,choice2;
+	do
+	{
+		printf("Press 1 to create an account.\n");
+		printf("Press 2 to login using existing account.\n");
+		scanf("%d",&choice1);
+		switch(choice1)
+		{
+			case 1:	{
+					create_account();
+					break;
+				}
+			case 2:	{
+					transactions();
+					break;
+				}
+			default:{
+					printf("\e[1;1H\e[2J");//REGEX to clear console
+					printf("You have entered an invalid choice.\
+What do you want to do?\n");
+					printf("Press 1 to retry.\n");
+					printf("Press anything else to exit.\n");
+					scanf("%d",&choice2);
+					if(choice2==1)
+						printf("\e[1;1H\e[2J");//REGEX to clear console
+					else
+						exit(0);
+					break;
+				}	
+		}		
+	}while(choice2==1);
+}
+void create_account()
+{
+	USRDAT user;		//CREATING USER....
+	printf("\e[1;1H\e[2J");//REGEX to clear console
+	while((getchar())!='\n');
+	printf("Please follow the procedures to create\
+ your account...\n");
+ 	int x;
+	do	//KEEP TAKING USER DATA UNTIL USER IS SATISFIED
+	{	
+		int error1;
+		printf("Enter your first name:\n(only first %d characters will be considered)\n",NAME1_SIZE-1);
+		getstring(user.name1st,NAME1_SIZE,CHARONLY);
+		printf("Enter your second name:\n(only first %d characters will be considered)\n",NAME2_SIZE-1);
+		getstring(user.name2nd,NAME2_SIZE,CHARONLY);
+		printf("Enter your username:\n(only first %d characters will be considered)\n",USERNAME_SIZE-1);
+		getstring(user.username,USERNAME_SIZE,CHARONLY);
+		printf("Enter your age(only first two numbers will be read)\n");
+		user.age=readage();
+		user.dob=readdob();
+		printf("Your data is as follows:\n");
+		printf("First name: %s\n",user.name1st);
+		printf("Second name: %s\n",user.name2nd);
+		printf("Age: %02d\n",user.age);
+		printf("Date of birth: %08ld\n",user.dob);
+		printf("Do you want to make any changes in your data? Press 1 if 'yes'.\n");
+		scanf("%d",&x);
+		printf("\e[1;1H\e[2J");//REGEX to clear console
+		while((getchar())!='\n');
+	}while(x==1);
+	printf("Your data will now be validated.\n");
+	printf("Now enter the type of account you wish to open.Press:\n\n");
+	do
+	{
+//BUFFER ERROR!
+//RECTIFY!
+		printf("'s' for a savings account\n'c' for a current account\n'f' for a fixed deposit account\n");
+		scanf("%c",&user.acc_type);
+		if(user.acc_type=='s' || user.acc_type=='c' || user.acc_type=='f' || user.acc_type=='S' || user.acc_type=='C' || user.acc_type=='F')
+			break;
+		else
+			printf("Invalid account type.Please retry.\n");
+	}while(1);
+	printf("Enter the amount you wish to deposit into your new account:\n");
+	printf("The minimum amount is Rs.5000\n");
+	scanf("%d",&user.amount);
+	int error1;
+	error1=validate(&user);
+	if(error1==1)
+		printf("XXX\n\n\n");
+	printf("Your account is going to be created....\n");
+	printf("You will now get your 10-digit password\n");
+	getrandom(user.passwd,PASSWD_SIZE);
+	printf("Password(REMEMBER THIS!):\t%s\n",user.passwd);
+	write_record(user,NEW);
+	writehistory(user);
+	printf("Your account has been created successfully!\n");
+}
+
+//Fn to read a string of characters
+
+void getstring(char* strptr,int n,int mode)
+{
+	int c,i;
+	for(i=0;i<n-1 && (c=getchar())!=EOF;i++)
+	{
+		if(mode==CHARONLY)
+		{
+			if(isalpha(c))
+			{
+				c=toupper(c);
+				strptr[i]=c;
+			}
+			else if(c=='\n')
+			{
+				if(i==0)
+				{
+					printf("This field is required.\n");
+					i=-1;
+				}
+				else
+					break;
+			}
+			else
+			{
+				printf("INVALID CHARACTER!Name cannot contain '%c'.\nTry again.\n",c);
+				while((getchar())!='\n');
+				i=-1;
+			}
+		}
+		else if(mode==RANDOM)
+		{
+			if(c==',' || c=='*')
+			{
+				printf("%c character is not allowed.Please retry\n",c);
+				i=-1;
+			}
+			else if(isalnum(c) || (c>=33 && c<=38))
+				strptr[i]=c;
+			else if(c=='\n')
+			{
+				if(i==0)
+				{
+					printf("This field is required.\n");
+					i=-1;
+				}
+				else
+					break;
+			}
+			else
+			{
+				printf("INVALID CHARACTER!Name cannot contain '%c'.\nTry again.\n",c);
+				while((getchar())!='\n');
+				i=-1;
+			}
+		}
+		else if(mode==USERINPUT)
+		{
+			if(c=='\n')
+				break;
+			else
+				strptr[i]=c;
+			
+		}
+		if(i==n-2)
+//Clearing buffer for next Fn call...
+			while((getchar())!='\n');
+	}
+	strptr[i]='\0';
+}
+
+
+int readage()
+{
+	int age,i;
+	do	//repeat the following while...
+	{
+		age=0,i=1;
+		int c;
+		while(i<=2 && (c=getchar())!=EOF)
+		{
+			if(isdigit(c))
+			{
+				age=(10*age)+(c-'0');
+				i++;
+			}
+			else if(c=='\n' && i==2)
+				break;
+			else if(c=='\n' && i==1)
+				printf("This is a required field\n");
+			else if(c!='\n')
+			{
+				printf("Invalid character.\n");
+				while((getchar())!='\n');
+			}
+		}
+		if(age==0)	
+		{
+			printf("Age cannot be zero.Please retry.\n");
+			while((getchar())!='\n');
+		}
+	}while(age==0);
+	if(i>2)
+		while((getchar())!='\n');
+	return age;
+}
+
+
+//Fn to read and return date of birth
+
+long int readdob()
+{
+	long int dob=0;
+	int dd,mm,yyyy;
+	printf("Enter your date of birth\n");
+	while(1)
+	{
+		while(1)
+		{
+			printf("Day(first two numbers):\t\t");
+			scanf("%2d",&dd);
+			while((getchar())!='\n');
+			if(dd>31 || dd<=0)
+				printf("We can have a maximum of thirty days only.Please retry\n");
+			else
+			{
+				while(1)
+				{
+					printf("month(first two numbers):\t");
+					scanf("%2d",&mm);
+					while((getchar())!='\n');
+					if(mm>=1 && mm<=12)
+						break;
+					else
+						printf("Only 12 months in a year.Please retry\n");
+				}
+				if(mm==1 || mm==3 || mm==5 ||mm==7 || mm==8 || mm==10 || mm==12)
+					break;
+				else if((mm==4 || mm==6 || mm==9 ||mm==11) && dd<=30)
+					break;
+				else if(mm==2 && dd<=29)
+					break;
+				else
+					printf("Number of days do not match.Please retry.\n");
+					//PRINT PROPER ERROR STATEMENT
+					//Enumerations may be necessary
+			}
+		}
+		printf("Year(first four numbers):\t");
+		scanf("%4d",&yyyy);
+		while((getchar())!='\n');
+		if(mm!=2)
+			break;
+		else
+		{
+			if ((yyyy%4==0 && yyyy%100!=0) || (yyyy%400==0))	//if leap year...
+			{	
+				if(dd<=29)
+					break;
+			}
+			else	//if not a leap year....		
+			{
+				if(dd<=28)
+					break;
+			}
+			printf("Too many days in February.Please retry\n");
+		}
+	}
+	dob=dob+dd;
+	dob=100*dob+mm;
+	dob=10000*dob+yyyy;
+	return dob;
+}
+
+
+int validate(USRDAT *u)
+{
+	FILE *fp;
+	fp=fopen("Database","a");
+	fclose(fp);
+	fopen("Database","r");
+	USRDAT t;
+	while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%d,%ld,%c,%d, ",t.name1st,t.name2nd,t.username,t.passwd,&t.age,&t.dob,&t.acc_type,&t.amount))!=EOF)
+	{
+		if(strcmp(t.username,u->username)==0)
+		//IF BOTH NAMES MATCH YOUR USERNAME IS NOT UNIQUE
+		{
+			while(strcmp(u->username,t.username)==0)
+			{
+				printf("Your current username matches that of another account.Please choose another username.\n");
+				getstring((*u).username,USERNAME_SIZE,CHARONLY);
+			}
+			/*
+		if(strcmp(t.acc_type,u->acc_type)==0 && strcmp(t.))
+		{
+			while(u->acc_type==t.acc_type)
+			{
+				printf("Your current account type matches your previous one.Please choose another account type.\n");
+				printf("You can have only one account of each type.\n");
+				char *p;
+				p=&(*u).acc_type;
+				scanf("%c",p);
+				if(*p=='s' || *p=='c' || *p=='f' || *p=='S' || *p=='C' || *p=='F')
+					break;
+				else
+					printf("Invalid account type.Please retry.\n");
+			}
+	*/	}
+	}
+	fclose(fp);
+}
+
+
+void getrandom(char* strptr,int n)
+{
+	int i;
+	for(i=0;i<n-1;i++)
+	{
+		char c;
+		while(1)
+		{
+			int t=time(NULL);
+			srand(rand()*time(NULL)*t);	
+			c=rand()%126;
+			if((isalnum(c) || (c>=33 && c<=38)) && c!=',' && c!='*')
+				break;
+		}
+			strptr[i]=c;
+	}
+	strptr[i]='\0';
+}
+
+void write_record(USRDAT u,int mode)
+{
+	long int offset;
+	if(mode==NEW)
+		offset=findblank();
+	else if(mode==REWRITE)
+		offset=deleterecord(u);
+	recordwrite(offset,u);
+}
+
+long int findblank()
+/*
+When we delete a record,we insert a special character at the beginning(here '*').
+If while reading ,if the first character of a record is that character that record is considered deleted.
+*/
+{
+	FILE *fp;	//OPENING FILE...IN READ-ONLY MODE
+	fp=fopen("Database","r");
+	long int p;	//VARIABLE TO RETURN POSITION
+	char c;
+	p=ftell(fp);
+	while((c=fgetc(fp))!=EOF)
+	{
+		if(c=='*')	//SPECIAL CHARACTER
+		{
+			fclose(fp);
+			//FOR FIRST DELETED LINE.... 
+			return p;
+		}
+		else
+		{
+			while(fgetc(fp)!='\n');	//TRAVERSE ENTIRE RECORD UNTIL THE END
+			p=ftell(fp);			//GET POSITION OF NEXT LINE
+		}
+	}
+	fclose(fp);
+	return -1;	//RETURN INVALID POSITION
+}
+
+
+void recordwrite(long int offset,USRDAT u)
+{
+	FILE *fp;
+	if(offset==-1)
+	{
+		fp=fopen("Database","a");
+		long int p=ftell(fp);
+		fprintf(fp,"%s,%s,%s,%s,%d,%ld,%c,%d,",u.name1st,u.name2nd,u.username,u.passwd,u.age,u.dob,u.acc_type,u.amount);
+		for(int i=1;i<=RECORD_LENGTH;i++)
+			fputc(' ',fp);
+		fprintf(fp,"\n");
+	}
+	else
+	{	
+		fp=fopen("Database","r+");	
+		fseek(fp,offset,SEEK_SET);
+		fprintf(fp,"%s,%s,%s,%s,%d,%ld,%c,%d,",u.name1st,u.name2nd,u.username,u.passwd,u.age,u.dob,u.acc_type,u.amount);
+	}
+	fclose(fp);
+}
+
+long int deleterecord(USRDAT u)
+//u is the user to be deleted...
+{
+	long int p;
+	FILE *fp;
+	fp=fopen("Database","r+");
+	p=ftell(fp);
+	USRDAT t;
+	while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%d,%ld,%c,%d, ",t.name1st,t.name2nd,t.username,t.passwd,&t.age,&t.dob,&t.acc_type,&t.amount))!=EOF)
+
+/*	
+TAKE PROPER INPUT FORMAT IN FSCANF.	
+*/	
+	{
+/*
+ERROR!
+COMPARISION OCCURS EVEN WHEN SURNAME IS TYPED.
+WE WANT COMPARASION ONLY FOR FIRST NAME.
+RECTIFY!!!
+*/
+
+//Deleting criteria inside if statement
+		if(strcmp(t.name1st,u.name1st)==0 && strcmp(t.name2nd,u.name2nd)==0)
+		{
+			fseek(fp,p,SEEK_SET);
+			for(int i=1;i<=RECORD_LENGTH;i++)
+				fputc(' ',fp);
+			fseek(fp,p,SEEK_SET);
+			fprintf(fp,"*, , , ,0,0, ,-1,");
+//I did this so that the delete sequence does not interfere with other r/w operations
+			break;
+		}
+		p=ftell(fp);
+	}
+	printf("exited\n");//debugging......
+	fclose(fp);
+	return p;
+}
+
+void showhistory(char*username,char*passwd)
+{
+	FILE *fp;
+	fp=fopen("History","r");
+	USRDAT u1,u2;
+	while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%c,%d, ",u1.name1st,u1.name2nd,u1.username,u1.passwd,&u1.acc_type,&u1.amount))!=EOF)
+		if(strcmp(username,u1.username)==0 && strcmp(passwd,u1.passwd)==0)
+			break;
+	fseek(fp,0,SEEK_SET);
+	while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%c,%d, ",u2.name1st,u2.name2nd,u2.username,u2.passwd,&u2.acc_type,&u2.amount))!=EOF)
+		if(strcmp(u2.name1st,u1.name1st)==0 && u2.acc_type==u1.acc_type && strcmp(u2.name2nd,u1.name2nd)==0)
+		{
+			u1=u2;
+			break;
+		}
+	printf("->\tAccount created.\n");
+	int difference;
+	while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%c,%d, ",u2.name1st,u2.name2nd,u2.username,u2.passwd,&u2.acc_type,&u2.amount))!=EOF)
+	{
+		if(strcmp(username,u2.username)==0 || strcmp(passwd,u2.passwd)==0)
+//make sure that we don't change the username and the password at the same time
+		{
+			printf("->\n");
+			difference=u2.amount-u1.amount;
+			if(difference<0)
+			{
+				printf("\tInitial amount: %d\n",u1.amount);
+				printf("\tAmount withdrawn: %d\n",-difference);
+				printf("\tBalance: %d\n",u2.amount);
+			}
+			else if(difference>0)
+			{
+				printf("\tInitial amount: %d\n",u1.amount);
+				printf("\tAmount deposited: %d\n",difference);
+				printf("\tBalance: %d\n",u2.amount);
+			}
+			if(strcmp(u1.passwd,u2.passwd)!=0)
+				printf("\tPassword changed.\n");
+			if(strcmp(u1.username,u2.username)!=0)
+				printf("\tUsername changed.\n");
+			u1=u2;
+		}
+	}
+	printf("\n");
+	printf("->\tCurrent balance:%d\n",u1.amount);
+	fclose(fp);	
+}
+
+
+
+void writehistory(USRDAT u)
+{
+	FILE *fp;
+	fp=fopen("History","a");
+	fprintf(fp,"%s,%s,%s,%s,%c,%d,\n",u.name1st,u.name2nd,u.username,u.passwd,u.acc_type,u.amount);	
+	fclose(fp);
+}
+
+
+USRDAT login()
+{
+	char username[USERNAME_SIZE], passwd[PASSWD_SIZE];
+	USRDAT u;
+	FILE *fp;
+	fp=fopen("Database","r");
+	int choice;
+	do
+	{
+		printf("Username:\n");
+		int c,i;
+		while(getchar()!='\n');
+		getstring(u.username,USERNAME_SIZE,USERINPUT);
+		printf("Password:\n");
+		getstring(u.passwd,PASSWD_SIZE,USERINPUT);		
+		USRDAT t;
+		while((fscanf(fp,"%[^,],%[^,],%[^,],%[^,],%d,%ld,%c,%d, ",t.name1st,t.name2nd,t.username,t.passwd,&t.age,&t.dob,&t.acc_type,&t.amount))!=EOF)
+		{
+			if(strcmp(u.username,t.username)==0 && strcmp(u.passwd,t.passwd)==0)
+			{
+				fclose(fp);
+				u=t;
+				printf("You have successfully logged in.\n");
+				return u;	//logged in with no error...			
+			}
+		}
+		printf("Your username and password did not match.Press:\n");
+		printf("1:Try again\n0:Exit\n");
+		scanf("%d",&choice);
+	}while(choice==1); 
+	fclose(fp);
+	exit(0);
+}
+
+void transactions()
+{
+	USRDAT user;
+	printf("\e[1;1H\e[2J");//REGEX to clear console
+	int choice3;
+	char cont2;
+	user=login();
+	printf("Press:\n");
+	printf("1 to view transaction history.\n");
+	printf("2 to go to accounts.\n");
+	scanf("%d",&choice3);
+	if(choice3==1)
+		showhistory(user.username,user.passwd);
+	else
+	{
+//			  if (user.acc_type == 's')
+//			  {
+//					  sav_acc(user);
+//			  }
+//			  else if (user.acc_type == 'c')
+//			  {
+				  cur_account(user);
+//			  }
+//				  else if (user.acc_type == 'f')
+//			  {
+//					  fd_acc(user);
+//			  }
+	}
+}
+
+//login account functions
+
+
+void cur_account(USRDAT u)
+{
+	FILE *fp;
+	fp=fopen("Database","r+");
+	printf("Current balance=%d\n",u.amount);
+	int op1;
+	float dep,wit;
+      /*
+      A current account is an account that allows the owner of the account to withdraw and
+      deposit without limitation or penalty. An account such as this can take loans upon
+      some guaranteed claim. There are no interests provided in this account.
+      */
+	printf("\e[1;1H\e[2J");//REGEX to clear console
+	do
+	{
+		printf("Press:\n1 to withdraw.\n2 to deposit.\n\n");
+		scanf("%d",&op1);
+		if (op1==1)
+		{
+			do
+			{
+				printf("Enter the amount you wish to withdraw:\n");
+				scanf("%f", &wit);
+				if(wit>u.amount)
+					printf("Insufficient amount in your account. Please try again.\n");
+			}while(wit>u.amount);
+			u.amount -= wit;
+		}
+		else if (op1==2)
+		{
+			printf("Enter the amount you wish to deposit:\n");
+			scanf("%f", &dep);
+			u.amount += dep;
+		}
+		printf("Press 1 to deposit/withdraw again.\n");
+		printf("Press anything else to continue.\n");
+		scanf("%d",&op1);
+	}while(op1==1);
+	write_record(u,REWRITE);
+	writehistory(u);
+	fclose(fp);
+	printf("Your transaction has been performed successfully.\n");
+	exit(0);
+}
+
+
